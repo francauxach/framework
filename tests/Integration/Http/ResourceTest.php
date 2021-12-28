@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Tests\Integration\Http\Fixtures\Author;
 use Illuminate\Tests\Integration\Http\Fixtures\AuthorResourceWithOptionalRelationship;
 use Illuminate\Tests\Integration\Http\Fixtures\EmptyPostCollectionResource;
+use Illuminate\Tests\Integration\Http\Fixtures\ObjectResource;
 use Illuminate\Tests\Integration\Http\Fixtures\Post;
 use Illuminate\Tests\Integration\Http\Fixtures\PostCollectionResource;
 use Illuminate\Tests\Integration\Http\Fixtures\PostResource;
@@ -53,6 +54,47 @@ class ResourceTest extends TestCase
                 'title' => 'Test Title',
             ],
         ]);
+    }
+
+    public function testAnObjectsMayBeConvertedToJson()
+    {
+        Route::get('/', function () {
+            return ObjectResource::make(
+                (object) ['first_name' => 'Bob', 'age' => 40]
+            );
+        });
+
+        $this->withoutExceptionHandling()
+            ->get('/', ['Accept' => 'application/json'])
+            ->assertStatus(200)
+            ->assertExactJson([
+                'data' => [
+                    'name' => 'Bob',
+                    'age' => 40,
+                ],
+            ]);
+    }
+
+    public function testArraysWithObjectsMayBeConvertedToJson()
+    {
+        Route::get('/', function () {
+            $objects = [
+                (object) ['first_name' => 'Bob', 'age' => 40],
+                (object) ['first_name' => 'Jack', 'age' => 25],
+            ];
+
+            return ObjectResource::collection($objects);
+        });
+
+        $this->withoutExceptionHandling()
+            ->get('/', ['Accept' => 'application/json'])
+            ->assertStatus(200)
+            ->assertExactJson([
+                'data' => [
+                    ['name' => 'Bob', 'age' => 40],
+                    ['name' => 'Jack', 'age' => 25],
+                ],
+            ]);
     }
 
     public function testResourcesMayHaveNoWrap()
@@ -486,6 +528,90 @@ class ResourceTest extends TestCase
         ]);
     }
 
+    public function testPaginatorResourceCanPreserveQueryParameters()
+    {
+        Route::get('/', function () {
+            $collection = collect([new Post(['id' => 2, 'title' => 'Laravel Nova'])]);
+            $paginator = new LengthAwarePaginator(
+                $collection, 3, 1, 2
+            );
+
+            return PostCollectionResource::make($paginator)->preserveQuery();
+        });
+
+        $response = $this->withoutExceptionHandling()->get(
+            '/?framework=laravel&author=Otwell&page=2', ['Accept' => 'application/json']
+        );
+
+        $response->assertStatus(200);
+
+        $response->assertJson([
+            'data' => [
+                [
+                    'id' => 2,
+                    'title' => 'Laravel Nova',
+                ],
+            ],
+            'links' => [
+                'first' => '/?framework=laravel&author=Otwell&page=1',
+                'last' => '/?framework=laravel&author=Otwell&page=3',
+                'prev' => '/?framework=laravel&author=Otwell&page=1',
+                'next' => '/?framework=laravel&author=Otwell&page=3',
+            ],
+            'meta' => [
+                'current_page' => 2,
+                'from' => 2,
+                'last_page' => 3,
+                'path' => '/',
+                'per_page' => 1,
+                'to' => 2,
+                'total' => 3,
+            ],
+        ]);
+    }
+
+    public function testPaginatorResourceCanReceiveQueryParameters()
+    {
+        Route::get('/', function () {
+            $collection = collect([new Post(['id' => 2, 'title' => 'Laravel Nova'])]);
+            $paginator = new LengthAwarePaginator(
+                $collection, 3, 1, 2
+            );
+
+            return PostCollectionResource::make($paginator)->withQuery(['author' => 'Taylor']);
+        });
+
+        $response = $this->withoutExceptionHandling()->get(
+            '/?framework=laravel&author=Otwell&page=2', ['Accept' => 'application/json']
+        );
+
+        $response->assertStatus(200);
+
+        $response->assertJson([
+            'data' => [
+                [
+                    'id' => 2,
+                    'title' => 'Laravel Nova',
+                ],
+            ],
+            'links' => [
+                'first' => '/?author=Taylor&page=1',
+                'last' => '/?author=Taylor&page=3',
+                'prev' => '/?author=Taylor&page=1',
+                'next' => '/?author=Taylor&page=3',
+            ],
+            'meta' => [
+                'current_page' => 2,
+                'from' => 2,
+                'last_page' => 3,
+                'path' => '/',
+                'per_page' => 1,
+                'to' => 2,
+                'total' => 3,
+            ],
+        ]);
+    }
+
     public function testToJsonMayBeLeftOffOfCollection()
     {
         Route::get('/', function () {
@@ -665,7 +791,8 @@ class ResourceTest extends TestCase
 
     public function testLeadingMergeKeyedValueIsMergedCorrectly()
     {
-        $filter = new class {
+        $filter = new class
+        {
             use ConditionallyLoadsAttributes;
 
             public function work()
@@ -685,7 +812,8 @@ class ResourceTest extends TestCase
 
     public function testLeadingMergeKeyedValueIsMergedCorrectlyWhenFirstValueIsMissing()
     {
-        $filter = new class {
+        $filter = new class
+        {
             use ConditionallyLoadsAttributes;
 
             public function work()
@@ -709,7 +837,8 @@ class ResourceTest extends TestCase
 
     public function testLeadingMergeValueIsMergedCorrectly()
     {
-        $filter = new class {
+        $filter = new class
+        {
             use ConditionallyLoadsAttributes;
 
             public function work()
@@ -734,7 +863,8 @@ class ResourceTest extends TestCase
 
     public function testMergeValuesMayBeMissing()
     {
-        $filter = new class {
+        $filter = new class
+        {
             use ConditionallyLoadsAttributes;
 
             public function work()
@@ -759,7 +889,8 @@ class ResourceTest extends TestCase
 
     public function testInitialMergeValuesMayBeMissing()
     {
-        $filter = new class {
+        $filter = new class
+        {
             use ConditionallyLoadsAttributes;
 
             public function work()
@@ -784,7 +915,8 @@ class ResourceTest extends TestCase
 
     public function testMergeValueCanMergeJsonSerializable()
     {
-        $filter = new class {
+        $filter = new class
+        {
             use ConditionallyLoadsAttributes;
 
             public function work()
@@ -815,7 +947,8 @@ class ResourceTest extends TestCase
 
     public function testMergeValueCanMergeCollectionOfJsonSerializable()
     {
-        $filter = new class {
+        $filter = new class
+        {
             use ConditionallyLoadsAttributes;
 
             public function work()
@@ -841,7 +974,8 @@ class ResourceTest extends TestCase
 
     public function testAllMergeValuesMayBeMissing()
     {
-        $filter = new class {
+        $filter = new class
+        {
             use ConditionallyLoadsAttributes;
 
             public function work()
@@ -866,7 +1000,8 @@ class ResourceTest extends TestCase
 
     public function testNestedMerges()
     {
-        $filter = new class {
+        $filter = new class
+        {
             use ConditionallyLoadsAttributes;
 
             public function work()

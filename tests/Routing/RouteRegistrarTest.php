@@ -129,6 +129,15 @@ class RouteRegistrarTest extends TestCase
         $this->seeMiddleware('controller-middleware');
     }
 
+    public function testCanRegisterRouteWithControllerActionArray()
+    {
+        $this->router->middleware('controller-middleware')
+                     ->get('users', [RouteRegistrarControllerStub::class, 'index']);
+
+        $this->seeResponse('controller', Request::create('users', 'GET'));
+        $this->seeMiddleware('controller-middleware');
+    }
+
     public function testCanRegisterRouteWithArrayAndControllerAction()
     {
         $this->router->middleware('controller-middleware')->put('users', [
@@ -333,6 +342,17 @@ class RouteRegistrarTest extends TestCase
 
         $this->assertTrue($this->router->getRoutes()->hasNamedRoute('users.update'));
         $this->assertTrue($this->router->getRoutes()->hasNamedRoute('users.destroy'));
+    }
+
+    public function testCanSetShallowOptionOnRegisteredResource()
+    {
+        $this->router->resource('users.tasks', RouteRegistrarControllerStub::class)->shallow();
+
+        $this->assertCount(7, $this->router->getRoutes());
+
+        $this->assertTrue($this->router->getRoutes()->hasNamedRoute('users.tasks.index'));
+        $this->assertTrue($this->router->getRoutes()->hasNamedRoute('tasks.show'));
+        $this->assertFalse($this->router->getRoutes()->hasNamedRoute('users.tasks.show'));
     }
 
     public function testCanExcludeMethodsOnRegisteredApiResource()

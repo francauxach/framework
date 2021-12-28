@@ -228,6 +228,35 @@ class DatabaseEloquentCollectionTest extends TestCase
         $this->assertEquals(BaseCollection::class, get_class($c));
     }
 
+    public function testMapWithKeys()
+    {
+        $one = m::mock(Model::class);
+        $two = m::mock(Model::class);
+
+        $c = new Collection([$one, $two]);
+
+        $key = 0;
+        $cAfterMap = $c->mapWithKeys(function ($item) use (&$key) {
+            return [$key++ => $item];
+        });
+
+        $this->assertEquals($c->all(), $cAfterMap->all());
+        $this->assertInstanceOf(Collection::class, $cAfterMap);
+    }
+
+    public function testMapWithKeysToNonModelsReturnsABaseCollection()
+    {
+        $one = m::mock(Model::class);
+        $two = m::mock(Model::class);
+
+        $key = 0;
+        $c = (new Collection([$one, $two]))->mapWithKeys(function ($item) use (&$key) {
+            return [$key++ => 'not-a-model'];
+        });
+
+        $this->assertEquals(BaseCollection::class, get_class($c));
+    }
+
     public function testCollectionDiffsWithGivenCollection()
     {
         $one = m::mock(Model::class);
@@ -420,6 +449,29 @@ class DatabaseEloquentCollectionTest extends TestCase
 
         $c = new Collection([new TestEloquentCollectionModel, (object) ['id' => 'something']]);
         $c->getQueueableClass();
+    }
+
+    public function testQueueableRelationshipsReturnsOnlyRelationsCommonToAllModels()
+    {
+        // This is needed to prevent loading non-existing relationships on polymorphic model collections (#26126)
+        $c = new Collection([
+            new class
+            {
+                public function getQueueableRelations()
+                {
+                    return ['user'];
+                }
+            },
+            new class
+            {
+                public function getQueueableRelations()
+                {
+                    return ['user', 'comments'];
+                }
+            },
+        ]);
+
+        $this->assertEquals(['user'], $c->getQueueableRelations());
     }
 
     public function testEmptyCollectionStayEmptyOnFresh()
